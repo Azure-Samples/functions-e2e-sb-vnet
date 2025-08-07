@@ -35,7 +35,7 @@ var appName = !empty(processorServiceName) ? processorServiceName : '${abbrs.web
 var deploymentStorageContainerName = 'app-package-${take(appName, 32)}-${take(resourceToken, 7)}'
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
-var principalIds = [processorUserAssignedIdentity.outputs.principalId, principalId]
+var principalIds = [processorUserAssignedIdentity.outputs.identityPrincipalId, principalId]
 
 // Organize resources in a resource group
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -45,13 +45,13 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 }
 
 // User assigned managed identity to be used by the Function App to reach storage and service bus
-module processorUserAssignedIdentity 'app/user-assigned-identity.bicep' = {
+module processorUserAssignedIdentity './core/identity/userAssignedIdentity.bicep' = {
   name: 'processorUserAssignedIdentity'
   scope: rg
   params: {
     location: location
     tags: tags
-    name: !empty(processorUserAssignedIdentityName) ? processorUserAssignedIdentityName : '${abbrs.managedIdentityUserAssignedIdentities}processor-${resourceToken}'
+    identityName: !empty(processorUserAssignedIdentityName) ? processorUserAssignedIdentityName : '${abbrs.managedIdentityUserAssignedIdentities}processor-${resourceToken}'
   }
 }
 
@@ -63,13 +63,13 @@ module processor './app/processor.bicep' = {
     name: appName
     location: location
     tags: tags
-    applicationInsightsName: monitoring.outputs.name
-    appServicePlanId: appServicePlan.outputs.resourceId
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    appServicePlanId: appServicePlan.outputs.id
     runtimeName: 'python'
     runtimeVersion: '3.10'
     storageAccountName: storage.outputs.name
-    identityId: processorUserAssignedIdentity.outputs.resourceId
-    identityClientId: processorUserAssignedIdentity.outputs.clientId
+    identityId: processorUserAssignedIdentity.outputs.identityId
+    identityClientId: processorUserAssignedIdentity.outputs.identityClientId
     appSettings: {
     }
     virtualNetworkSubnetId: serviceVirtualNetwork.outputs.appSubnetID
@@ -79,26 +79,19 @@ module processor './app/processor.bicep' = {
   }
 }
 
-// Backing storage for Azure functions processor - AVM-like implementation with local auth disabled
-module storage 'app/storage-account.bicep' = {
+// Backing storage for Azure functions processor
+module storage './core/storage/storage-account.bicep' = {
   name: 'storage'
   scope: rg
   params: {
     name: !empty(storageAccountName) ? storageAccountName : '${abbrs.storageStorageAccounts}${resourceToken}'
-    allowBlobPublicAccess: false
-    allowSharedKeyAccess: false // Disable local authentication methods as per policy
-    dnsEndpointType: 'Standard'
+    location: location
+    tags: tags
     publicNetworkAccess: 'Disabled'
     networkAcls: {
       defaultAction: 'Deny'
-      bypass: 'None'
     }
-    blobServices: {
-      containers: [{name: deploymentStorageContainerName}]
-    }
-    minimumTlsVersion: 'TLS1_2'  // Enforcing TLS 1.2 for better security
-    location: location
-    tags: tags
+    containers: [{name: deploymentStorageContainerName}]
   }
 }
 
@@ -115,24 +108,22 @@ module storageBlobDataOwnerRoleDefinitionApi 'app/storage-Access.bicep' = [for r
   }
 }]
 
-// App Service Plan - AVM-like implementation
-module appServicePlan 'app/serverfarm.bicep' = {
+module appServicePlan './core/host/appserviceplan.bicep' = {
   name: 'appserviceplan'
   scope: rg
   params: {
     name: !empty(appServicePlanName) ? appServicePlanName : '${abbrs.webServerFarms}${resourceToken}'
+    location: location
+    tags: tags
     sku: {
       name: 'FC1'
       tier: 'FlexConsumption'
     }
-    reserved: true
-    location: location
-    tags: tags
   }
 }
 
-// Service Bus - using updated module that disables local authentication
-module serviceBus 'app/servicebus.bicep' = {
+// Service Bus
+module serviceBus 'core/message/servicebus.bicep' = {
   name: 'serviceBus'
   scope: rg
   params: {
@@ -190,32 +181,20 @@ module storagePrivateEndpoint 'app/storage-PrivateEndpoint.bicep' = {
   }
 }
 
-// Monitor application with Azure Monitor - AVM-like implementation with local auth disabled
-module logAnalytics 'app/log-analytics-workspace.bicep' = {
-  name: '${uniqueString(deployment().name, location)}-loganalytics'
+// Monitor application with Azure Monitor
+module monitoring './core/monitor/monitoring.bicep' = {
+  name: 'monitoring'
   scope: rg
   params: {
-    name: !empty(logAnalyticsName) ? logAnalyticsName : '${abbrs.operationalInsightsWorkspaces}${resourceToken}'
     location: location
     tags: tags
-    dataRetention: 30
-  }
-}
- 
-module monitoring 'app/application-insights.bicep' = {
-  name: '${uniqueString(deployment().name, location)}-appinsights'
-  scope: rg
-  params: {
-    name: !empty(applicationInsightsName) ? applicationInsightsName : '${abbrs.insightsComponents}${resourceToken}'
-    location: location
-    tags: tags
-    workspaceResourceId: logAnalytics.outputs.resourceId
-    disableLocalAuth: true
+    logAnalyticsName: !empty(logAnalyticsName) ? logAnalyticsName : '${abbrs.operationalInsightsWorkspaces}${resourceToken}'
+    applicationInsightsName: !empty(applicationInsightsName) ? applicationInsightsName : '${abbrs.insightsComponents}${resourceToken}'
   }
 }
 
 // App outputs
-output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.connectionString
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = monitoring.outputs.applicationInsightsConnectionString
 output AZURE_LOCATION string = location
 output AZURE_TENANT_ID string = tenant().tenantId
 output SERVICE_PROCESSOR_NAME string = processor.outputs.SERVICE_PROCESSOR_NAME
