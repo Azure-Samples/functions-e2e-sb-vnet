@@ -17,8 +17,17 @@ A common scenario that Azure Functions can be used for is for the processing of 
 
 This sample demonstrates a function app running in a Flex Consumption plan that connects to Service Bus running in a virtual network. This sample demonstrates these two key features of the Flex Consumption plan:
 
-* **High scale**. A low concurency of 1 is configured for the function app in the `host.json` file. Once messages are loaded into Service Bus and the app is started, you can see how it scales to one app instance per message simultaneously.
-* **Virtual newtork integration**. The Service Bus that this Flex Consumption app reads events from is secured behind a private endpoint. The function app can read events from it because it is configured with VNet integration. All connections to Service Bus and to the storage account associated with the Flex Consumption app also use managed identity connections instead of connection strings.
+* **High scale**. A low concurrency of 1 is configured for the function app in the `host.json` file. Once messages are loaded into Service Bus and the app is started, you can see how it scales to one app instance per message simultaneously.
+* **Virtual network integration**. The Service Bus that this Flex Consumption app reads events from is secured behind a private endpoint. The function app can read events from it because it is configured with VNet integration. All connections to Service Bus and to the storage account associated with the Flex Consumption app also use managed identity connections instead of connection strings.
+
+## Infrastructure and Security
+
+This sample uses modern Azure infrastructure practices:
+
+* **Azure Verified Module (AVM) patterns**: The Bicep templates follow AVM standards for consistent, secure, and maintainable infrastructure as code.
+* **Enhanced Security**: Local authentication is disabled for Service Bus, Application Insights, and Storage Account to enforce managed identity usage.
+* **Zero Trust Network Access**: All resources use private endpoints and VNet integration for secure communication.
+* **Premium Service Bus**: Uses Premium SKU for enhanced performance and security features.
 
 ![Diagram showing Service Bus with a private endpoint and an Azure Functions Flex Consumption app triggering from it via VNet integration](./img/SB-VNET.png)
 
@@ -60,13 +69,13 @@ To set up this sample, follow these steps:
   Connect-AzAccount
   ```
 
-4. Move into the `SB-VNET` folder using the following command:
+4. Navigate to the repository root where the sample is located:
 
   ```bash
-  cd E2E/SB-VNET
+  cd functions-e2e-sb-vnet
   ```
 
-5. Use [Azure Dev CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows) to provision a new resource group with the environment name you provide and all the resources for the sample, then publish the code to the function app. It will also ask you for a password to be used for the Virtual Machine.
+5. Use [Azure Dev CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows) to provision a new resource group with the environment name you provide and all the resources for the sample, then publish the code to the function app.
 
   ```bash
   azd up
@@ -74,17 +83,18 @@ To set up this sample, follow these steps:
 
 ## Inspect the solution (optional)
 
-1. Once the deployment is done, inspect the new resource group. The Flex Consumption function app and plan, storage, App Insights, Service Bus, and networking services have been created and configured:
+1. Once the deployment is done, inspect the new resource group. The Flex Consumption function app and plan, storage, App Insights, Service Bus, and networking services have been created and configured using Azure Verified Module (AVM) patterns:
 ![List of resources created by the bicep template](./img/resources.png)
-1. The Service Bus namespace public network access has been turned off so nothing outside the VNet can access Service Bus. You can check this in the Service Bus  Namespace's `Networking` tab and the `Public access` tab:
+1. The Service Bus namespace has local authentication disabled for enhanced security. Public network access has also been turned off so nothing outside the VNet can access Service Bus. You can check this in the Service Bus Namespace's `Networking` tab and the `Public access` tab:
 ![Service Bus public network access turned off](./img/sb-disabled-network-access.png)
 1. The Service Bus namespace has a private endpoint configured to one of the subnets in the VNet. This means it can only be accessed from inside the VNet. You can check this in the Service Bus Namespace's `Networking` tab and the `Private Endpoint connections`:
 ![Service Bus private endpoint](./img/sb-private-endpoint.png)
 1. An outbound virtual network integration has been created in your Function App into another subnet in the same VNet. This means it can access the Service Bus namespace. You can check this in the function app's `Networking` tab in the `Outbound traffic configuration` section:
 ![Function App Networking tab](./img/func-vnet.png)
-1. Open the Application Insights instance that was created by the Bicep deploy. Open the `Live metrics` tab to monitor for live events. Notice that it can't connect to the application, or shows only one 'server' online. This is expected, because the Flex Consupmtion app is scaled to down as there's no traffic or executions happening yet.
+1. The storage account has local authentication (shared key access) disabled, and Application Insights has local authentication disabled for enhanced security.
+1. Open the Application Insights instance that was created by the Bicep deploy. Open the `Live metrics` tab to monitor for live events. Notice that it can't connect to the application, or shows only one 'server' online. This is expected, because the Flex Consumption app is scaled down as there's no traffic or executions happening yet.
 1. Inspect [the host.json file](./src/host.json) and notice that Service Bus' `maxConcurrentCalls` has been set to 1. This makes the per instance concurrency be 1 so your function will scale to multiple instances to handle messages put in the Service Bus queue.
-1. Inspect the [function_app.py](./src/function_app.py) and notice there is a delay of 30 seconds in the code, to simulate that the each message would take 30 seconds to complete being processed.
+1. Inspect the [function_app.py](./src/function_app.py) and notice there is a delay of 30 seconds in the code, to simulate that each message would take 30 seconds to complete being processed.
 
 ## Test the solution
 
@@ -93,7 +103,7 @@ To set up this sample, follow these steps:
 You can then follow [Use Service Bus Explorer to run data operations on Service Bus](https://learn.microsoft.com/en-us/azure/service-bus-messaging/explorer) to send messages and peek messages from the queue.
 ![Service Bus explorer showing messages in the queue](./img/sb-messages.png)
 1. Use the Service Bus Explorer in the portal or app to send 1,000 messages.
-1. Open Application Insights live metrics and notice the number of instances ('servers online'). Notice your app scaling the number of instances to handle processing the messages. Given there is a purpuseful [30 second delay in the app code](./src/function_app.py#L12) you should see the messages being processed in 30 seconds intervals once the the app's maximum instance count (default of 100) is reached. The sample telemetry should also show that your messages are triggering the function, and making their way from Service Bus through the VNet into the function app for processing.
+1. Open Application Insights live metrics and notice the number of instances ('servers online'). Notice your app scaling the number of instances to handle processing the messages. Given there is a purposeful [30 second delay in the app code](./src/function_app.py#L12) you should see the messages being processed in 30 second intervals once the app's maximum instance count (default of 100) is reached. The sample telemetry should also show that your messages are triggering the function, and making their way from Service Bus through the VNet into the function app for processing.
 ![Live metrics available](./img/live-metrics.png)
 
 ## Clean up resources
