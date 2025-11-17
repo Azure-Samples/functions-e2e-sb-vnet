@@ -8,3 +8,15 @@ services:
     project: ./src/
     language: python
     host: function
+
+hooks:
+  postprovision:
+    windows:
+      run: |
+        pwsh -File ./infra/scripts/postprovision.ps1
+        pwsh -File ./infra/scripts/addclientip.ps1
+    posix:
+      run: |
+        chmod +x ./infra/scripts/*.sh
+        ./infra/scripts/postprovision.sh
+        ./infra/scripts/addclientip.sh

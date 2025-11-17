@@ -15,79 +15,49 @@ param stSubnetName string = 'st'
 
 param tags object = {}
 
-resource virtualNetwork 'Microsoft.Network/virtualNetworks@2023-05-01' = {
-  name: vNetName
-  location: location
-  tags: tags
-  properties: {
-    addressSpace: {
-      addressPrefixes: [
-        '10.0.0.0/16'
-      ]
-    }
-    encryption: {
-      enabled: false
-      enforcement: 'AllowUnencrypted'
-    }
+module virtualNetwork 'br/public:avm/res/network/virtual-network:0.7.1' = {
+  name: '${uniqueString(deployment().name, location)}-vnet'
+  params: {
+    name: vNetName
+    location: location
+    tags: tags
+    addressPrefixes: [
+      '10.0.0.0/16'
+    ]
     subnets: [
       {
         name: sbSubnetName
-        id: resourceId('Microsoft.Network/virtualNetworks/subnets', vNetName, sbSubnetName)
-        properties: {
-          addressPrefixes: [
-            '10.0.1.0/24'
-          ]
-          delegations: []
-          privateEndpointNetworkPolicies: 'Disabled'
-          privateLinkServiceNetworkPolicies: 'Enabled'
-        }
-        type: 'Microsoft.Network/virtualNetworks/subnets'
+        addressPrefixes: [
+          '10.0.1.0/24'
+        ]
+        privateEndpointNetworkPolicies: 'Disabled'
+        privateLinkServiceNetworkPolicies: 'Enabled'
       }
       {
         name: appSubnetName
-        id: resourceId('Microsoft.Network/virtualNetworks/subnets', vNetName, appSubnetName)
-        properties: {
-          addressPrefixes: [
-            '10.0.2.0/23'
-          ]
-          delegations: [
-            {
-              name: 'delegation'
-              id: '${resourceId('Microsoft.Network/virtualNetworks/subnets', vNetName, appSubnetName)}/delegations/delegation'
-              properties: {
-                //Microsoft.App/environments is the correct delegation for Flex Consumption VNet integration
-                serviceName: 'Microsoft.App/environments'
-              }
-              type: 'Microsoft.Network/virtualNetworks/subnets/delegations'
-            }
-          ]
-          privateEndpointNetworkPolicies: 'Disabled'
-          privateLinkServiceNetworkPolicies: 'Enabled'
-        }
-        type: 'Microsoft.Network/virtualNetworks/subnets'
+        addressPrefixes: [
+          '10.0.2.0/23'
+        ]
+        delegation: 'Microsoft.App/environments'
+        privateEndpointNetworkPolicies: 'Disabled'
+        privateLinkServiceNetworkPolicies: 'Enabled'
       }
       {
         name: stSubnetName
-        id: resourceId('Microsoft.Network/virtualNetworks/subnets', vNetName, stSubnetName)
-        properties: {
-          addressPrefixes: [
-            '10.0.4.0/24'
-          ]
-          delegations: []
-          privateEndpointNetworkPolicies: 'Disabled'
-          privateLinkServiceNetworkPolicies: 'Enabled'
-        }
-        type: 'Microsoft.Network/virtualNetworks/subnets'
+        addressPrefixes: [
+          '10.0.4.0/24'
+        ]
+        privateEndpointNetworkPolicies: 'Disabled'
+        privateLinkServiceNetworkPolicies: 'Enabled'
       }
     ]
-    virtualNetworkPeerings: []
-    enableDdosProtection: false
   }
 }
 
-output sbSubnetName string = virtualNetwork.properties.subnets[0].name
-output sbSubnetID string = virtualNetwork.properties.subnets[0].id
-output appSubnetName string = virtualNetwork.properties.subnets[1].name
-output appSubnetID string = virtualNetwork.properties.subnets[1].id
-output stSubnetName string = virtualNetwork.properties.subnets[2].name
-output stSubnetID string = virtualNetwork.properties.subnets[2].id
+output sbSubnetName string = virtualNetwork.outputs.subnetNames[0]
+output sbSubnetID string = virtualNetwork.outputs.subnetResourceIds[0]
+output appSubnetName string = virtualNetwork.outputs.subnetNames[1]
+output appSubnetID string = virtualNetwork.outputs.subnetResourceIds[1]
+output stSubnetName string = virtualNetwork.outputs.subnetNames[2]
+output stSubnetID string = virtualNetwork.outputs.subnetResourceIds[2]
+output resourceId string = virtualNetwork.outputs.resourceId
