@@ -12,11 +12,8 @@ services:
 hooks:
   postprovision:
     windows:
-      run: |
-        pwsh -File ./infra/scripts/postprovision.ps1
-        pwsh -File ./infra/scripts/addclientip.ps1
+      shell: pwsh
+      run: ./infra/scripts/setuplocalenvironment.ps1
     posix:
-      run: |
-        chmod +x ./infra/scripts/*.sh
-        ./infra/scripts/postprovision.sh
-        ./infra/scripts/addclientip.sh
+      shell: sh
+      run: ./infra/scripts/setuplocalenvironment.sh
