@@ -25,7 +25,7 @@ $ClientIP = Invoke-RestMethod -Uri 'https://api.ipify.org'
 Write-Output "Adding client IP $ClientIP to Service Bus network rules"
 
 # Add the client IP to the network rule and mark the public network access as enabled since the client IP is added to the network rule
-az servicebus namespace network-rule-set create --resource-group $ResourceGroup --namespace-name $ServiceBusNamespace --default-action "Deny" --public-network-access "Enabled" --ip-rules "[{action:Allow,ip-address:$ClientIP}]" > /dev/null
+az servicebus namespace network-rule-set create --resource-group $ResourceGroup --namespace-name $ServiceBusNamespace --default-action "Deny" --public-network-access "Enabled" --ip-rules "[{action:Allow,ip-address:$ClientIP}]" | Out-Null
 
 Write-Output "Successfully updated Service Bus network rules"
 

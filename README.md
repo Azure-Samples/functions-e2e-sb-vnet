@@ -122,7 +122,7 @@ This serverless architecture enables highly scalable, event-driven message proce
    # Set up Python environment for testing
    cd test-send
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   source venv/bin/activate  # On Windows: venv\Scripts\Activate
    pip install azure-servicebus azure-identity
 
    # Send test messages (run from project root)
