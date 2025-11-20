@@ -91,7 +91,15 @@ This serverless architecture enables highly scalable, event-driven message proce
    az login
    ```
 
-4. **Provision Azure resources using azd**
+4. **Initialize azd environment**
+
+   ```bash
+   azd env new
+   ```
+
+   This will prompt you to create a new environment. Choose a name for your environment (e.g., "flexsbe2evnet").
+
+5. **Provision Azure resources using azd**
 
    ```bash
    azd provision
@@ -105,7 +113,7 @@ This serverless architecture enables highly scalable, event-driven message proce
    * Configures VNet integration and private endpoints
    * Creates the local development configuration file
 
-5. **Start the function app locally**
+6. **Start the function app locally**
 
    ```bash
    cd src
@@ -114,7 +122,7 @@ This serverless architecture enables highly scalable, event-driven message proce
 
    Or use VS Code with the Azure Functions extension (press F5).
 
-6. **Send test messages to verify local functionality**
+7. **Send test messages to verify local functionality**
 
    With the function app running locally, run the included Python test script from a different terminal:
 
@@ -157,7 +165,7 @@ This serverless architecture enables highly scalable, event-driven message proce
 
 When running locally, you have sequential processing as it's single instance processing messages (i.e., only your local machine), and the concurrency limit is set to 1 in [host.json](./src/host.json). Each message will take 30 seconds to complete as there's a [delay of 30 seconds](./src/function_app.py) in the python function app code.  When deployed to Azure with Flex Consumption, the behavior changes dramatically: with automatic scaling, Azure creates one instance per message and multiple messages are processed simultaneously.
 
-7. **Deploy to Azure**
+8. **Deploy to Azure**
 
 Stop the local function app, and then run the following command from the root folder of the sample:
 
@@ -167,7 +175,7 @@ Stop the local function app, and then run the following command from the root fo
 
    This builds and deploys your function app to Azure, then verifies the deployment.
 
-8. **Test the deployed function**
+9. **Test the deployed function**
 
    * Navigate to your Function App in the Azure Portal
    * Go to Functions → **servicebus_trigger** → **Monitor** tab
